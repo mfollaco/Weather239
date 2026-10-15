@@ -2,6 +2,7 @@ import http from 'node:http';
 import { readFileSync, existsSync } from 'node:fs';
 import { extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { dashboardObservation } from './lib/observation.mjs';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
 
@@ -52,13 +53,7 @@ async function dashboard() {
   if (!observation) throw new Error('Weather Underground returned no observation for this station.');
   return {
     station: config.station,
-    observation: {
-      ...observation.imperial,
-      obsTimeLocal: observation.obsTimeLocal,
-      obsTimeUtc: observation.obsTimeUtc,
-      solarRadiation: observation.solarRadiation,
-      pressureTrend: observation.pressureTrend,
-    },
+    observation: dashboardObservation(observation),
     hourly: hourly.properties.periods.slice(0, 24),
     daily: sevenDay.properties.periods.slice(0, 14),
     alerts: alerts.features.map(({ properties }) => ({ event: properties.event, headline: properties.headline, severity: properties.severity, description: properties.description, expires: properties.expires })),
