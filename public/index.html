@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#101827"><title>Mike's Weather</title><link rel="stylesheet" href="/style.css"></head>
+<body><main>
+  <header><div><p class="eyebrow">IRONDEQUOIT, NY · KNYIROND36</p><h1>Mike’s Weather</h1></div><button id="refresh" aria-label="Refresh weather">↻</button></header>
+  <p id="status" class="status">Loading backyard conditions…</p>
+  <section id="alerts" class="alerts" hidden></section>
+  <section class="hero card"><div><p id="condition" class="condition">—</p><div class="temp"><span id="temp">—</span><sup>°F</sup></div><p id="feels">Feels like —</p></div><div class="freshness"><span>●</span><span id="fresh">—</span></div></section>
+  <section class="metrics card"><div><span>Humidity</span><strong id="humidity">—</strong></div><div><span>Dew point</span><strong id="dew">—</strong></div><div><span>Wind</span><strong id="wind">—</strong></div><div><span>Gust</span><strong id="gust">—</strong></div><div><span>Pressure</span><strong id="pressure">—</strong></div><div><span>Rain today</span><strong id="rain">—</strong></div></section>
+  <section><div class="section-title"><h2>Next 24 hours</h2><span>Forecast</span></div><div id="hourly" class="hourly"></div></section>
+  <section><div class="section-title"><h2>7-day outlook</h2><span>Forecast</span></div><div id="daily" class="daily card"></div></section>
+</main><template id="alert"><article><b></b><p></p></article></template><script src="/app.js"></script></body></html>
