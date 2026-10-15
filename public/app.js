@@ -13,14 +13,20 @@ function setupRadar(location) {
   const map = L.map(mapElement, { zoomControl: true, scrollWheelZoom: true, maxZoom: 7 }).setView(center, 7);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 7, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
   L.marker(center, { icon: L.divIcon({ className: 'station-marker', html: '<span><b>⌖</b></span>', iconSize: [30, 30], iconAnchor: [15, 30] }) }).addTo(map).bindTooltip('Weather239 station', { direction: 'top', offset: [0, -26] });
-  radar = { map, layer: null, frames: [], playing: false, timer: null };
+  const lakeLabel = L.marker([43.71, -77.72], { interactive: false, keyboard: false, icon: L.divIcon({ className: 'lake-america-label', html: '<span>Lake America</span>', iconSize: [112, 22], iconAnchor: [56, 11] }) }).addTo(map);
+  const fitRadar = () => { map.invalidateSize({ pan: false }); map.setView(center, map.getZoom(), { animate: false }); lakeLabel.setOpacity(map.getZoom() >= 6 ? 1 : 0); };
+  const scheduleRadarFit = () => { requestAnimationFrame(() => requestAnimationFrame(fitRadar)); };
+  const resizeObserver = window.ResizeObserver ? new ResizeObserver(scheduleRadarFit) : null; resizeObserver?.observe(mapElement);
+  window.addEventListener('resize', scheduleRadarFit); window.addEventListener('orientationchange', () => setTimeout(scheduleRadarFit, 150));
+  map.whenReady(() => { scheduleRadarFit(); setTimeout(scheduleRadarFit, 200); }); map.on('zoomend', fitRadar);
+  radar = { map, layer: null, frames: [], playing: false, timer: null, fit: scheduleRadarFit, resizeObserver };
   fetch('https://api.rainviewer.com/public/weather-maps.json').then(response => { if (!response.ok) throw new Error('Radar service unavailable'); return response.json(); }).then(data => {
     radar.frames = data.radar?.past || []; if (!radar.frames.length) throw new Error('No recent radar frames available'); radar.host = data.host; timeline.max = String(radar.frames.length - 1); timeline.value = timeline.max; showRadarFrame(Number(timeline.value));
   }).catch(() => { mapElement.innerHTML = '<div class="radar-unavailable">Radar is temporarily unavailable. Please try again shortly.</div>'; });
   timeline.addEventListener('input', () => { stopRadar(); showRadarFrame(Number(timeline.value)); });
   play.addEventListener('click', () => radar.playing ? stopRadar() : playRadar());
   $('radar-fullscreen').addEventListener('click', () => { if (document.fullscreenElement) document.exitFullscreen(); else $('radar-card').requestFullscreen?.(); });
-  document.addEventListener('fullscreenchange', () => { $('radar-fullscreen').textContent = document.fullscreenElement ? '×' : '⛶'; map.invalidateSize(); });
+  document.addEventListener('fullscreenchange', () => { $('radar-fullscreen').textContent = document.fullscreenElement ? '×' : '⛶'; scheduleRadarFit(); setTimeout(scheduleRadarFit, 150); });
 }
 function showRadarFrame(index) {
   if (!radar?.frames[index]) return; if (radar.layer) radar.map.removeLayer(radar.layer);
@@ -39,7 +45,7 @@ function render(data) {
   $('pressure').textContent = o.pressure == null ? '—' : `${Number(o.pressure).toFixed(2)} in${trend}`;
   $('rain').textContent = o.precipTotal == null ? '—' : `${Number(o.precipTotal).toFixed(2)} in`;
   $('fresh').textContent = freshness(o.obsTimeLocal || o.obsTimeUtc); $('status').textContent = `Station observation · refreshed ${new Date(data.updatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
-  $('hourly').innerHTML = data.hourly.map(p => `<article><time>${periodTime(p.startTime)}</time><div class="icon">${icon(p.shortForecast)}</div><b>${p.temperature}°</b><small>${p.probabilityOfPrecipitation?.value ?? 0}% rain</small></article>`).join('');
+  $('hourly').innerHTML = data.hourly.map(p => `<article><time>${periodTime(p.startTime)}</time><div class="icon">${icon(p.shortForecast)}</div><b>${p.temperature}°</b><small>${p.probabilityOfPrecipitation?.value ?? 0}%<span>rain</span></small></article>`).join('');
   const combined = []; for (const p of data.daily) { const day = dayName(p.startTime); const item = combined.find(x => x.day === day); if (item) { item.low = p.temperature; } else combined.push({ day, p, high: p.temperature, low: null }); }
   $('daily').innerHTML = combined.slice(0, 7).map(({ day, p, high, low }) => `<div class="day"><b>${day}</b><span>${icon(p.shortForecast)} ${p.shortForecast}</span><strong>${high}°</strong><strong>${low == null ? '—' : `${low}°`}</strong></div>`).join('');
   setupRadar(data.location);
