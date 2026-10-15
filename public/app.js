@@ -4,6 +4,30 @@ const icon = (text = '') => /thunder/i.test(text) ? '⛈️' : /snow|ice/i.test(
 function freshness(iso) { const minutes = Math.max(0, Math.round((Date.now() - new Date(iso)) / 60000)); return minutes < 2 ? 'Updated just now' : `Updated ${minutes}m ago`; }
 function periodTime(start) { return new Intl.DateTimeFormat([], { hour: 'numeric' }).format(new Date(start)); }
 function dayName(start) { const d = new Date(start); return d.toDateString() === new Date().toDateString() ? 'Today' : new Intl.DateTimeFormat([], { weekday: 'short' }).format(d); }
+let radar;
+function radarTime(unixTime) { return new Intl.DateTimeFormat([], { hour: 'numeric', minute: '2-digit' }).format(new Date(unixTime * 1000)); }
+function setupRadar(location) {
+  if (radar || !window.L || !location) return;
+  const mapElement = $('radar-map'); const timeline = $('radar-timeline'); const timeOutput = $('radar-time'); const play = $('radar-play');
+  const center = [location.latitude, location.longitude];
+  const map = L.map(mapElement, { zoomControl: true, scrollWheelZoom: true, maxZoom: 7 }).setView(center, 7);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 7, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
+  L.marker(center, { icon: L.divIcon({ className: 'station-marker', html: '<span><b>⌖</b></span>', iconSize: [30, 30], iconAnchor: [15, 30] }) }).addTo(map).bindTooltip('Weather239 station', { direction: 'top', offset: [0, -26] });
+  radar = { map, layer: null, frames: [], playing: false, timer: null };
+  fetch('https://api.rainviewer.com/public/weather-maps.json').then(response => { if (!response.ok) throw new Error('Radar service unavailable'); return response.json(); }).then(data => {
+    radar.frames = data.radar?.past || []; if (!radar.frames.length) throw new Error('No recent radar frames available'); radar.host = data.host; timeline.max = String(radar.frames.length - 1); timeline.value = timeline.max; showRadarFrame(Number(timeline.value));
+  }).catch(() => { mapElement.innerHTML = '<div class="radar-unavailable">Radar is temporarily unavailable. Please try again shortly.</div>'; });
+  timeline.addEventListener('input', () => { stopRadar(); showRadarFrame(Number(timeline.value)); });
+  play.addEventListener('click', () => radar.playing ? stopRadar() : playRadar());
+  $('radar-fullscreen').addEventListener('click', () => { if (document.fullscreenElement) document.exitFullscreen(); else $('radar-card').requestFullscreen?.(); });
+  document.addEventListener('fullscreenchange', () => { $('radar-fullscreen').textContent = document.fullscreenElement ? '×' : '⛶'; map.invalidateSize(); });
+}
+function showRadarFrame(index) {
+  if (!radar?.frames[index]) return; if (radar.layer) radar.map.removeLayer(radar.layer);
+  const frame = radar.frames[index]; radar.layer = L.tileLayer(`${radar.host}${frame.path}/256/{z}/{x}/{y}/2/1_1.png`, { opacity: .72, maxZoom: 7, zIndex: 10 }); radar.layer.addTo(radar.map); $('radar-timeline').value = String(index); $('radar-time').textContent = index === radar.frames.length - 1 ? `Latest · ${radarTime(frame.time)}` : radarTime(frame.time);
+}
+function stopRadar() { if (!radar) return; radar.playing = false; clearInterval(radar.timer); $('radar-play').textContent = '▶'; $('radar-play').setAttribute('aria-label', 'Play radar animation'); }
+function playRadar() { if (!radar?.frames.length) return; radar.playing = true; $('radar-play').textContent = '❚❚'; $('radar-play').setAttribute('aria-label', 'Pause radar animation'); radar.timer = setInterval(() => { showRadarFrame((Number($('radar-timeline').value) + 1) % radar.frames.length); }, 650); }
 function render(data) {
   const o = data.observation;
   $('condition').textContent = o.wxPhraseMedium || o.wxPhraseLong || 'Current conditions';
@@ -18,6 +42,7 @@ function render(data) {
   $('hourly').innerHTML = data.hourly.map(p => `<article><time>${periodTime(p.startTime)}</time><div class="icon">${icon(p.shortForecast)}</div><b>${p.temperature}°</b><small>${p.probabilityOfPrecipitation?.value ?? 0}% rain</small></article>`).join('');
   const combined = []; for (const p of data.daily) { const day = dayName(p.startTime); const item = combined.find(x => x.day === day); if (item) { item.low = p.temperature; } else combined.push({ day, p, high: p.temperature, low: null }); }
   $('daily').innerHTML = combined.slice(0, 7).map(({ day, p, high, low }) => `<div class="day"><b>${day}</b><span>${icon(p.shortForecast)} ${p.shortForecast}</span><strong>${high}°</strong><strong>${low == null ? '—' : `${low}°`}</strong></div>`).join('');
+  setupRadar(data.location);
   if (data.alerts.length) { const container = $('alerts'); container.hidden = false; container.innerHTML = data.alerts.map(a => `<article><b>${a.event} · ${a.severity}</b><p>${a.headline}</p></article>`).join(''); }
 }
 async function load() { $('status').textContent = 'Loading backyard conditions…'; try { const response = await fetch('/api/dashboard'); const data = await response.json(); if (!response.ok) throw new Error(data.error); render(data); } catch (error) { $('status').textContent = error.message; } }

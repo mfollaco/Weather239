@@ -1,4 +1,4 @@
-# Mike's Weather Dashboard
+# Weather239 Dashboard
 
 1. In Terminal, go to this folder.
 2. Copy `.env.example` to `.env`.

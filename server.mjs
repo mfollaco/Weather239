@@ -29,7 +29,7 @@ const cache = new Map();
 async function fetchJson(url, options = {}) {
   const hit = cache.get(url);
   if (hit && Date.now() - hit.time < 120000) return hit.value;
-  const response = await fetch(url, { headers: { 'User-Agent': 'MikesWeatherDashboard/1.0 contact: local-dashboard' }, ...options });
+  const response = await fetch(url, { headers: { 'User-Agent': 'Weather239Dashboard/1.0 contact: local-dashboard' }, ...options });
   if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
   const value = await response.json();
   cache.set(url, { time: Date.now(), value });
@@ -53,6 +53,7 @@ async function dashboard() {
   if (!observation) throw new Error('Weather Underground returned no observation for this station.');
   return {
     station: config.station,
+    location: { latitude: Number(config.latitude), longitude: Number(config.longitude) },
     observation: dashboardObservation(observation),
     hourly: hourly.properties.periods.slice(0, 24),
     daily: sevenDay.properties.periods.slice(0, 14),
